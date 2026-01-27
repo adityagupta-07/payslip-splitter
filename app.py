@@ -8,7 +8,7 @@ import re
 # Page Config
 st.set_page_config(page_title="Ultra Tendency Payslip Splitter", page_icon="📄")
 st.title("📄 Payslip Splitter")
-st.info("Upload the master PDF. I will rename files as: Name_EmployeeNumber.pdf")
+st.info("Goal: Rename files as 'Name_ID.pdf'")
 
 uploaded_file = st.file_uploader("Upload Master PDF", type="pdf")
 
@@ -17,54 +17,55 @@ if uploaded_file is not None:
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, "w") as zf:
-        # Use pdfplumber to read text accurately
         with pdfplumber.open(uploaded_file) as pdf:
             for i, page in enumerate(pdf.pages):
                 text = page.extract_text()
                 
-                # Default values in case extraction fails
-                emp_name = "Unknown_Employee"
-                emp_id = str(i + 1)
+                emp_name = "Unknown"
+                emp_id = "00"
                 
-                # Split text into lines and clean them
+                # Split and clean lines
                 lines = [line.strip() for line in text.split('\n') if line.strip()]
                 
                 for idx, line in enumerate(lines):
-                    # 1. Extract Employee ID
+                    # 1. FIXED ID LOGIC
                     if "Employee ID" in line:
-                        # Finds the first number in the line (e.g., '28')
-                        id_search = re.findall(r'\d+', line)
-                        if id_search:
-                            emp_id = id_search[0]
+                        # Extract all numbers from this line
+                        ids = re.findall(r'\d+', line)
+                        if ids:
+                            emp_id = ids[0]
                     
-                    # 2. Extract Employee Name
-                    # In your PDF, the name usually follows the header 'Employee Name'
+                    # 2. FIXED NAME LOGIC
+                    # In your PDF, 'Employee Name' and 'Designation' are in the same box
                     if "Employee Name" in line:
-                        if idx + 1 < len(lines):
-                            # The name is on the next line
-                            emp_name = lines[idx + 1]
-                            # Clean up in case 'Designation' is attached to the string
-                            emp_name = emp_name.split("Designation")[0].strip()
-
-                # --- NAMING RULE ---
-                # This turns "Aditya Kumar Gupta" into "Aditya_Kumar_Gupta"
+                        # We check the next 1 or 2 lines to find the actual name
+                        for offset in [1, 2]:
+                            if idx + offset < len(lines):
+                                potential_name = lines[idx + offset]
+                                # If the line isn't another label, it's the name!
+                                if "Designation" not in potential_name and "Contact" not in potential_name:
+                                    emp_name = potential_name
+                                    break
+                
+                # --- FINAL CLEANING ---
+                # Remove any leftover "Designation" text if it got stuck to the name
+                emp_name = emp_name.split("Designation")[0].strip()
+                
+                # The Rule: Aditya_Kumar_Gupta_28
                 clean_name = emp_name.replace(" ", "_")
-                # Result: "Aditya_Kumar_Gupta_28.pdf"
                 filename = f"{clean_name}_{emp_id}.pdf"
 
-                # Create the individual PDF page
+                # Save page
                 writer = PdfWriter()
                 writer.add_page(reader.pages[i])
-                
-                # Write page to memory and add to ZIP
                 page_io = io.BytesIO()
                 writer.write(page_io)
                 zf.writestr(filename, page_io.getvalue())
 
-    st.success(f"Successfully processed {len(reader.pages)} payslips!")
+    st.success("Successfully processed!")
     st.download_button(
-        label="📥 Download All Payslips (ZIP)",
+        label="📥 Download ZIP",
         data=zip_buffer.getvalue(),
-        file_name="Split_Payslips.zip",
+        file_name="Processed_Payslips.zip",
         mime="application/zip"
     )
