@@ -8,7 +8,7 @@ import re
 # Page Config
 st.set_page_config(page_title="Ultra Tendency Payslip Splitter", page_icon="📄")
 st.title("📄 Payslip Splitter")
-st.info("Goal: Rename files as 'Name_ID.pdf'")
+# st.info("Goal: Rename files as 'Name_ID.pdf'")
 
 uploaded_file = st.file_uploader("Upload Master PDF", type="pdf")
 
